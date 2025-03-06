@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:organiz4t3/screens/forgot_password_screen.dart';
+import 'package:organiz4t3/screens/register_screen.dart';
 import 'package:organiz4t3/services/firebase_service.dart';
 import 'package:organiz4t3/widgets/social_login_button.dart';
-import '../services/auth_service.dart';
-import 'registro_screen.dart'; // Importa la pantalla de registro
+import '../services/auth_service.dart'; // Importa la pantalla de registro
 import 'home_screen.dart'; // Importa la pantalla de registro
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -194,8 +194,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   _buildRegisterButton(),
                   const SizedBox(height: 32),
 
-                  // Social Login Buttons
-                  _buildSocialLogin(),
                 ],
               ),
             ),
@@ -254,29 +252,10 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       height: 50,
       child: OutlinedButton(
-        onPressed: () {Navigator.push(context, MaterialPageRoute(builder: (context) => const RegistroScreen()),);
+        onPressed: () {Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()),);
         },
         child: const Text('Registrarse'),
       ),
-    );
-  }
-
-  Widget _buildSocialLogin() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        SocialLoginButton(
-          icon: FontAwesomeIcons.google, 
-          color: Colors.red, 
-          onPressed: _loginWithGoogle,
-        ),
-        const SizedBox(width: 24),
-        SocialLoginButton(
-          icon: FontAwesomeIcons.facebook, 
-          color: Colors.blue, 
-          onPressed: _loginWithFacebook,
-        ),
-      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/task.dart';
+import '../models/user.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -32,6 +33,26 @@ class FirebaseService {
 
   Future<void> signOut() async {
     await _auth.signOut();
+  }
+
+  Future<UserModel?> getCurrentUserModel() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        userData['id'] = user.uid;
+        return UserModel.fromMap(userData);
+      }
+    }
+    return null;
+  }
+
+  Future<void> createUserProfile(UserModel user) async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      await _firestore.collection('users').doc(currentUser.uid).set(user.toMap());
+    }
   }
 
   Future<List<Task>> getTasks() async {
@@ -90,12 +111,10 @@ class FirebaseService {
     }
   }
 
-  Future<void> updateUserProfile(String name) async {
-    User? user = _auth.currentUser;
-    if (user != null) {
-      await _firestore.collection('users').doc(user.uid).set({
-        'name': name,
-      }, SetOptions(merge: true));
+  Future<void> updateUserProfile(UserModel user) async {
+    User? currentUser = _auth.currentUser;
+    if (currentUser != null) {
+      await _firestore.collection('users').doc(currentUser.uid).update(user.toMap());
     }
   }
 

@@ -1,55 +1,122 @@
-// services/notification_service.dart
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:timezone/timezone.dart' as tz;
-import 'package:flutter_native_timezone/flutter_native_timezone.dart';
+import 'package:timezone/data/latest.dart' as tz_data;
+import '../models/task.dart';
 
 class NotificationService {
-  static final NotificationService _notificationService = NotificationService._internal();
-
-  factory NotificationService() {
-    return _notificationService;
-  }
-
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
   NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
   Future<void> init() async {
-    tz.initializeTimeZones();
-    final String timeZoneName = await FlutterNativeTimezone.getLocalTimezone();
-    tz.setLocalLocation(tz.getLocation(timeZoneName));
+    // Inicializar timezone
+    tz_data.initializeTimeZones();
 
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    final InitializationSettings initializationSettings = const InitializationSettings(
+    // Configurar notificaciones locales
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+    const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
     );
 
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    // Solicitar permisos para notificaciones push
+    await _firebaseMessaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // Configurar manejadores de mensajes
+    FirebaseMessaging.onMessage.listen(_handleMessage);
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
   }
 
-  /*Future<void> showNotification(int id, String title, String body, int seconds) async {
-    await flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
+  Future<String?> getToken() async {
+    return await _firebaseMessaging.getToken();
+  }
+
+  void _handleMessage(RemoteMessage message) {
+    print('Mensaje recibido mientras la app está en primer plano: ${message.notification?.title}');
+    _showNotification(
+      message.notification?.title ?? 'Nueva notificación',
+      message.notification?.body ?? '',
+    );
+  }
+
+  void _handleMessageOpenedApp(RemoteMessage message) {
+    print('Mensaje abierto desde la notificación: ${message.notification?.title}');
+    // Aquí puedes navegar a una pantalla específica si es necesario
+  }
+
+  Future<void> _showNotification(String title, String body) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'task_channel',
+      'Task Notifications',
+      channelDescription: 'Notifications for tasks',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await _flutterLocalNotificationsPlugin.show(
+      0,
       title,
       body,
-      tz.TZDateTime.now(tz.local).add(Duration(seconds: seconds)),
+      platformChannelSpecifics,
+    );
+  }
+
+  Future<void> scheduleTaskReminder(Task task) async {
+    // Programar una notificación para 1 día antes de la fecha de vencimiento
+    final scheduledDate = tz.TZDateTime.from(
+      task.fechaVencimiento.subtract(const Duration(days: 1)),
+      tz.local,
+    );
+
+    // Verificar si la fecha ya pasó
+    if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) {
+      return;
+    }
+
+    await _flutterLocalNotificationsPlugin.zonedSchedule(
+      task.id.hashCode,
+      '¡Tarea próxima a vencer!',
+      'La tarea "${task.titulo}" vence mañana.',
+      scheduledDate,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'main_channel',
-          'Main Channel',
-          channelDescription: 'Main channel notifications',
+          'task_reminder_channel',
+          'Task Reminders',
+          channelDescription: 'Reminders for tasks',
           importance: Importance.max,
           priority: Priority.high,
         ),
       ),
-      uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
-      androidAllowWhileIdle: true, androidScheduleMode: null,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time,
     );
-  }*/
+  }
 
-  Future<void> cancelNotification(int id) async {
-    await flutterLocalNotificationsPlugin.cancel(id);
+  Future<void> cancelTaskReminder(Task task) async {
+    await _flutterLocalNotificationsPlugin.cancel(task.id.hashCode);
   }
 }
+
