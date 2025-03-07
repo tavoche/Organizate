@@ -31,6 +31,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final List<String> _countries = ['Argentina', 'Colombia', 'México', 'Perú', 'Chile', 'Uruguay', 'Brasil', 'Venezuela'];
   String _selectedCountry = 'Colombia';
 
+  // Lista de profesiones/tipos de usuario
+  final List<String> _professions = ['student', 'employee', 'other'];
+  String _selectedProfession = 'student';
+
   @override
   void initState() {
     super.initState();
@@ -68,12 +72,28 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           _user = user;
           _nameController.text = user.name;
           _phoneController.text = user.phoneNumber;
-          _selectedCountry = user.location;
+          
+          // Verificar si el país existe en la lista
+          if (_countries.contains(user.location)) {
+            _selectedCountry = user.location;
+          }
+          
+          // Verificar si la profesión existe en la lista
+          if (_professions.contains(user.userType)) {
+            _selectedProfession = user.userType;
+          }
+          
           _notificationsPreference = user.notificationsPreference;
-          _themePreference = user.themePreference;
+          
+          // Verificar si el tema es válido
+          if (['light', 'dark', 'system'].contains(user.themePreference)) {
+            _themePreference = user.themePreference;
+          }
         });
       } else {
         print("No se encontró el perfil del usuario en Firestore");
+        // Crear un perfil de usuario predeterminado si no existe
+        _createDefaultUserProfile(firebaseUser);
       }
     } catch (e) {
       print("Error al cargar el perfil: $e");
@@ -81,6 +101,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _createDefaultUserProfile(User firebaseUser) async {
+    try {
+      final defaultUser = UserModel(
+        id: firebaseUser.uid,
+        name: firebaseUser.displayName ?? 'Usuario',
+        email: firebaseUser.email ?? '',
+        phoneNumber: firebaseUser.phoneNumber ?? '',
+        birthDate: DateTime.now(),
+        notificationsPreference: true,
+        themePreference: 'light',
+        location: 'Colombia',
+        userType: 'student',
+      );
+      
+      await _firebaseService.createUserProfile(defaultUser);
+      
+      setState(() {
+        _user = defaultUser;
+        _nameController.text = defaultUser.name;
+        _phoneController.text = defaultUser.phoneNumber;
+        _selectedCountry = defaultUser.location;
+        _selectedProfession = defaultUser.userType;
+        _notificationsPreference = defaultUser.notificationsPreference;
+        _themePreference = defaultUser.themePreference;
+      });
+      
+    } catch (e) {
+      print("Error al crear perfil predeterminado: $e");
     }
   }
 
@@ -114,7 +165,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           notificationsPreference: _notificationsPreference,
           themePreference: _themePreference,
           location: _selectedCountry,
-          userType: _user!.userType,
+          userType: _selectedProfession,
         );
 
         // 2. Guardar en Firebase
@@ -248,9 +299,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     );
                   }).toList(),
                   onChanged: (value) {
-                    setState(() {
-                      _selectedCountry = value!;
-                    });
+                    if (value != null) {
+                      setState(() {
+                        _selectedCountry = value;
+                      });
+                    }
                   },
                   decoration: InputDecoration(
                     labelText: 'País',
@@ -260,6 +313,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                
+                DropdownButtonFormField<String>(
+                  value: _selectedProfession,
+                  items: _professions.map((profession) {
+                    return DropdownMenuItem(
+                      value: profession,
+                      child: Row(
+                            children: [
+                              Icon(
+                                profession == 'student' 
+                                  ? Icons.school 
+                                  : profession == 'employee' 
+                                    ? Icons.work 
+                                    : Icons.person,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                profession == 'student' 
+                                  ? 'Estudiante' 
+                                  : profession == 'employee' 
+                                    ? 'Empleado' 
+                                    : 'Otro'
+                              ),
+                            ],
+                          ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        _selectedProfession = value;
+                      });
+                    }
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Profesión',
+                    prefixIcon: const Icon(Icons.person_outline),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                
                 const SizedBox(height: 24),
                 
                 // Preferencias
@@ -291,7 +389,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       value: 'light',
                       child: Row(
                         children: const [
-                          Icon(Icons.light_mode),
+                          Icon(Icons.light_mode, color: Colors.orange),
                           SizedBox(width: 8),
                           Text('Tema Claro'),
                         ],
@@ -301,17 +399,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       value: 'dark',
                       child: Row(
                         children: const [
-                          Icon(Icons.dark_mode),
+                          Icon(Icons.dark_mode, color: Colors.indigo),
                           SizedBox(width: 8),
                           Text('Tema Oscuro'),
                         ],
                       ),
                     ),
+                    DropdownMenuItem(
+                      value: 'system',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.settings_suggest, color: Colors.grey),
+                          SizedBox(width: 8),
+                          Text('Tema del Sistema'),
+                        ],
+                      ),
+                    ),
                   ],
                   onChanged: (value) {
-                    setState(() {
-                      _themePreference = value!;
-                    });
+                    if (value != null) {
+                      setState(() {
+                        _themePreference = value;
+                      });
+                    }
                   },
                   decoration: InputDecoration(
                     labelText: 'Tema de la aplicación',
@@ -353,3 +463,4 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 }
+

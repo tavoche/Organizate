@@ -27,13 +27,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   List<Task> tasks = [];
+  String _currentUserName = '';
 
-  String _selectedFilter = 'Todas';
+  String _selectedFilter = 'Pendientes';
   final List<String> _filters = ['Todas', 'Pendientes', 'Completadas'];
 
   @override
   void initState() {
     super.initState();
+    _currentUserName = widget.userName;
     _loadTasks();
   }
 
@@ -41,6 +43,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final loadedTasks = await _firebaseService.getTasks();
     setState(() {
       tasks = loadedTasks;
+    });
+  }
+
+  Future<void> _refreshUserName() async {
+    final updatedName = await _firebaseService.getUserName();
+    setState(() {
+      _currentUserName = updatedName;
     });
   }
 
@@ -61,15 +70,21 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Mis Tareas'),
         actions: [
+          // Botón para editar perfil
           IconButton(
             icon: const Icon(Icons.person),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => EditProfileScreen(userId: FirebaseAuth.instance.currentUser!.uid),
-                ),
-              );
+            onPressed: () async {
+              final userId = FirebaseAuth.instance.currentUser?.uid;
+              if (userId != null) {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => EditProfileScreen(userId: userId),
+                  ),
+                );
+                // Actualizar el nombre del usuario después de editar el perfil
+                _refreshUserName();
+              }
             },
           ),
           IconButton(
@@ -91,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '¡Hola, ${widget.userName}!',
+                  '¡Hola, $_currentUserName!',
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -129,57 +144,63 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Expanded(
-            child: filteredTasks.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.task_alt,
-                          size: 80,
-                          color: Colors.grey[400],
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No hay tareas',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
+            child: RefreshIndicator(
+              onRefresh: () async {
+                await _loadTasks();
+                await _refreshUserName();
+              },
+              child: filteredTasks.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.task_alt,
+                            size: 80,
+                            color: Colors.grey[400],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          Text(
+                            'No hay tareas',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: filteredTasks.length,
+                      itemBuilder: (context, index) {
+                        final task = filteredTasks[index];
+                        return TaskCard(
+                          task: task,
+                          onToggleComplete: () async {
+                            task.completada = !task.completada;
+                            await _firebaseService.updateTask(task);
+                            setState(() {});
+                          },
+                          onDelete: () async {
+                            await _firebaseService.deleteTask(task.id);
+                            setState(() {
+                              tasks.removeWhere((t) => t.id == task.id);
+                            });
+                          },
+                          onEdit: (updatedTask) async {
+                            await _firebaseService.updateTask(updatedTask);
+                            setState(() {
+                              final index = tasks.indexWhere((t) => t.id == updatedTask.id);
+                              if (index != -1) {
+                                tasks[index] = updatedTask;
+                              }
+                            });
+                          },
+                        );
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: filteredTasks.length,
-                    itemBuilder: (context, index) {
-                      final task = filteredTasks[index];
-                      return TaskCard(
-                        task: task,
-                        onToggleComplete: () async {
-                          task.completada = !task.completada;
-                          await _firebaseService.updateTask(task);
-                          setState(() {});
-                        },
-                        onDelete: () async {
-                          await _firebaseService.deleteTask(task.id);
-                          setState(() {
-                            tasks.removeWhere((t) => t.id == task.id);
-                          });
-                        },
-                        onEdit: (updatedTask) async {
-                          await _firebaseService.updateTask(updatedTask);
-                          setState(() {
-                            final index = tasks.indexWhere((t) => t.id == updatedTask.id);
-                            if (index != -1) {
-                              tasks[index] = updatedTask;
-                            }
-                          });
-                        },
-                      );
-                    },
-                  ),
+            ),
           ),
         ],
       ),

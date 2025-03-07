@@ -1,8 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/user.dart';
 import '../services/firebase_service.dart';
+import '../theme/theme_provider.dart';
 import 'home_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -33,6 +35,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   final List<String> _userTypes = ['student', 'employee', 'other'];
   final List<String> _themes = ['light', 'dark', 'system'];
+  // Lista de países
+  final List<String> _countries = ['Argentina', 'Colombia', 'México', 'Perú', 'Chile', 'Uruguay', 'Brasil', 'Venezuela'];
+  String _selectedCountry = 'Colombia';
 
   @override
   void dispose() {
@@ -69,145 +74,102 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /*Future<void> _register() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
-      try {
-        final user = await _firebaseService.signUp(
-          _emailController.text,
-          _passwordController.text,
-        );
-        if (mounted) {
-          if (user != null) {
-            // Crear perfil de usuario
-            final userModel = UserModel(
-              id: user.uid,
-              name: _nameController.text,
-              email: _emailController.text,
-              phoneNumber: _phoneController.text,
-              birthDate: _selectedDate,
-              notificationsPreference: _notificationsEnabled,
-              themePreference: _selectedTheme,
-              location: _locationController.text,
-              userType: _selectedUserType,
-            );
-            
-            await _firebaseService.createUserProfile(userModel);
-            
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomeScreen(
-                    userName: _nameController.text,
-                    updateTask: _firebaseService.updateTask,
-                    deleteTask: _firebaseService.deleteTask,
-                  ),
-                ),
-              );
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Error al registrar. Inténtalo de nuevo.')),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
+  // Validación para el número de teléfono
+  String? _validatePhoneNumber(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Por favor ingrese un número de teléfono';
     }
-  }*/
+    // Solo aceptar números y exactamente 10 dígitos
+    final phoneRegex = RegExp(r'^\d{10}$');
+    if (!phoneRegex.hasMatch(value)) {
+      return 'El número de teléfono debe tener 10 dígitos';
+    }
+    return null;
+  }
 
   Future<void> _register() async {
-  if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) return;
 
-  setState(() {
-    _isLoading = true;
-  });
+    setState(() {
+      _isLoading = true;
+    });
 
-  try {
-    // Intentar registrar al usuario
-    final user = await _firebaseService.signUp(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-
-    if (user != null) {
-      // Crear perfil de usuario
-      final userModel = UserModel(
-        id: user.uid,
-        name: _nameController.text.trim(),
-        email: _emailController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
-        birthDate: _selectedDate,
-        notificationsPreference: _notificationsEnabled,
-        themePreference: _selectedTheme,
-        location: _locationController.text.trim(),
-        userType: _selectedUserType,
+    try {
+      // Intentar registrar al usuario
+      final user = await _firebaseService.signUp(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
 
-      await _firebaseService.createUserProfile(userModel);
+      if (user != null) {
+        // Crear perfil de usuario
+        final userModel = UserModel(
+          id: user.uid,
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          phoneNumber: _phoneController.text.trim(),
+          birthDate: _selectedDate,
+          notificationsPreference: _notificationsEnabled,
+          themePreference: _selectedTheme,
+          location: _selectedCountry,
+          userType: _selectedUserType,
+        );
+
+        await _firebaseService.createUserProfile(userModel);
+
+        // Aplicar el tema seleccionado
+        if (mounted) {
+          final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+          await themeProvider.saveTheme(_selectedTheme);
+        }
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                userName: _nameController.text,
+                updateTask: _firebaseService.updateTask,
+                deleteTask: _firebaseService.deleteTask,
+              ),
+            ),
+          );
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      // Manejo de errores específicos de Firebase
+      String errorMessage = 'Ocurrió un error. Inténtalo de nuevo.';
+
+      if (e.code == 'email-already-in-use') {
+        errorMessage = 'El correo ya está registrado. Intenta iniciar sesión.';
+      } else if (e.code == 'weak-password') {
+        errorMessage = 'La contraseña es demasiado débil. Usa una más segura.';
+      } else if (e.code == 'invalid-email') {
+        errorMessage = 'El formato del correo no es válido.';
+      } else if (e.code == 'operation-not-allowed') {
+        errorMessage = 'El registro de usuarios está deshabilitado.';
+      }
 
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(
-              userName: _nameController.text,
-              updateTask: _firebaseService.updateTask,
-              deleteTask: _firebaseService.deleteTask,
-            ),
-          ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(errorMessage)),
         );
       }
-    }
-  } on FirebaseAuthException catch (e) {
-    // Manejo de errores específicos de Firebase
-    String errorMessage = 'Ocurrió un error. Inténtalo de nuevo.';
-
-    if (e.code == 'email-already-in-use') {
-      errorMessage = 'El correo ya está registrado. Intenta iniciar sesión.';
-    } else if (e.code == 'weak-password') {
-      errorMessage = 'La contraseña es demasiado débil. Usa una más segura.';
-    } else if (e.code == 'invalid-email') {
-      errorMessage = 'El formato del correo no es válido.';
-    } else if (e.code == 'operation-not-allowed') {
-      errorMessage = 'El registro de usuarios está deshabilitado.';
-    }
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage)),
-      );
-    }
-  } catch (e) {
-    // Captura de errores genéricos
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error inesperado: ${e.toString()}')),
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+    } catch (e) {
+      // Captura de errores genéricos
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error inesperado: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
-}
-
 
   @override
   Widget build(BuildContext context) {
@@ -326,12 +288,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Por favor ingresa tu número de teléfono';
-                      }
-                      return null;
-                    },
+                    validator: _validatePhoneNumber,
                   ),
                   const SizedBox(height: 16),
                   
@@ -364,17 +321,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 16),
                   
                   // Location Field
-                  TextFormField(
-                    controller: _locationController,
-                    decoration: InputDecoration(
-                      labelText: 'Ubicación',
-                      hintText: 'Ingresa tu ubicación',
-                      prefixIcon: const Icon(Icons.location_on_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                  DropdownButtonFormField<String>(
+                  value: _selectedCountry,
+                  items: _countries.map((country) {
+                    return DropdownMenuItem(
+                      value: country,
+                      child: Text(country),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCountry = value!;
+                    });
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'País',
+                    prefixIcon: const Icon(Icons.public),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
+                ),
                   const SizedBox(height: 32),
                   
                   // Seguridad
@@ -493,34 +460,59 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       border: Border.all(color: Colors.grey[400]!),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedTheme,
-                        isExpanded: true,
-                        icon: const Icon(Icons.arrow_drop_down),
-                        iconSize: 24,
-                        elevation: 16,
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedTheme = newValue;
-                            });
-                          }
-                        },
-                        items: _themes.map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(value == 'light' ? 'Light' : value == 'dark' ? 'Dark' : 'System'),
-                          );
-                        }).toList(),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedTheme,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.color_lens_outlined),
                       ),
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down),
+                      iconSize: 24,
+                      elevation: 16,
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedTheme = newValue;
+                          });
+                        }
+                      },
+                      items: _themes.map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Row(
+                            children: [
+                              Icon(
+                                value == 'light' 
+                                  ? Icons.light_mode 
+                                  : value == 'dark' 
+                                    ? Icons.dark_mode 
+                                    : Icons.settings_suggest,
+                                color: value == 'light' 
+                                  ? Colors.orange 
+                                  : value == 'dark' 
+                                    ? Colors.indigo 
+                                    : Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                value == 'light' 
+                                  ? 'Tema Claro' 
+                                  : value == 'dark' 
+                                    ? 'Tema Oscuro' 
+                                    : 'Tema del Sistema'
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   
                   // User Type
                   Text(
-                    'Tipo de usuario',
+                    'Profesión',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -530,30 +522,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       border: Border.all(color: Colors.grey[400]!),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedUserType,
-                        isExpanded: true,
-                        icon: const Icon(Icons.arrow_drop_down),
-                        iconSize: 24,
-                        elevation: 16,
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() {
-                              _selectedUserType = newValue;
-                            });
-                          }
-                        },
-                        items: _userTypes.map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value == 'student' ? 'Estudiante' : 
-                              value == 'employee' ? 'Empleado' : 'Otro'
-                            ),
-                          );
-                        }).toList(),
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedUserType,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
+                      isExpanded: true,
+                      icon: const Icon(Icons.arrow_drop_down),
+                      iconSize: 24,
+                      elevation: 16,
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() {
+                            _selectedUserType = newValue;
+                          });
+                        }
+                      },
+                      items: _userTypes.map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Row(
+                            children: [
+                              Icon(
+                                value == 'student' 
+                                  ? Icons.school 
+                                  : value == 'employee' 
+                                    ? Icons.work 
+                                    : Icons.person,
+                                color: Theme.of(context).primaryColor,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                value == 'student' 
+                                  ? 'Estudiante' 
+                                  : value == 'employee' 
+                                    ? 'Empleado' 
+                                    : 'Otro'
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
                   const SizedBox(height: 32),
