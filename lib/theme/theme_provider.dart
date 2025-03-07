@@ -1,37 +1,53 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {
-  static const String _key = 'theme';
+  final ThemeService _themeService = ThemeService();
   String _theme = 'light';
-
-  String get theme => _theme;
 
   ThemeProvider() {
     _loadTheme();
   }
 
-  // Cargar el tema guardado
+  String get theme => _theme;
+  
+  ThemeData get themeData {
+    return _theme == 'dark' ? _darkTheme : _lightTheme;
+  }
+
+  // Tema claro
+  final ThemeData _lightTheme = ThemeData(
+    brightness: Brightness.light,
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: Colors.white,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.blue,
+      foregroundColor: Colors.white,
+    ),
+    // Puedes personalizar más aspectos del tema aquí
+  );
+
+  // Tema oscuro
+  final ThemeData _darkTheme = ThemeData(
+    brightness: Brightness.dark,
+    primarySwatch: Colors.blue,
+    scaffoldBackgroundColor: Colors.grey[900],
+    appBarTheme: AppBarTheme(
+      backgroundColor: Colors.grey[800],
+      foregroundColor: Colors.white,
+    ),
+    // Puedes personalizar más aspectos del tema aquí
+  );
+
   Future<void> _loadTheme() async {
-    final prefs = await SharedPreferences.getInstance();
-    _theme = prefs.getString(_key) ?? 'light';
-    notifyListeners(); // Notificar a los listeners cuando el tema cambia
+    _theme = await _themeService.getTheme();
+    notifyListeners();
   }
 
-  // Guardar el tema seleccionado
   Future<void> saveTheme(String theme) async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString(_key, theme);
     _theme = theme;
-    notifyListeners(); // Notificar a los listeners cuando se guarda el tema
-  }
-
-  // Cambiar entre tema oscuro y claro
-  ThemeData getThemeData() {
-    if (_theme == 'dark') {
-      return ThemeData.dark();
-    } else {
-      return ThemeData.light();
-    }
+    await _themeService.saveTheme(theme);
+    notifyListeners();
   }
 }
+
