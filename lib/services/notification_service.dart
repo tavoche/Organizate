@@ -83,36 +83,81 @@ class NotificationService {
   }
 
   Future<void> scheduleTaskReminder(Task task) async {
-    // Programar una notificación para 1 día antes de la fecha de vencimiento
-    final scheduledDate = tz.TZDateTime.from(
-      task.fechaVencimiento.subtract(const Duration(days: 1)),
-      tz.local,
-    );
+    // Si la tarea no tiene hora específica, programar para el día anterior
+    if (task.horaVencimiento == null) {
+      final scheduledDate = tz.TZDateTime.from(
+        task.fechaVencimiento.subtract(const Duration(days: 1)),
+        tz.local,
+      );
 
-    // Verificar si la fecha ya pasó
-    if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) {
-      return;
-    }
+      // Verificar si la fecha ya pasó
+      if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) {
+        return;
+      }
 
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      task.id.hashCode,
-      '¡Tarea próxima a vencer!',
-      'La tarea "${task.titulo}" vence mañana.',
-      scheduledDate,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'task_reminder_channel',
-          'Task Reminders',
-          channelDescription: 'Reminders for tasks',
-          importance: Importance.max,
-          priority: Priority.high,
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        task.id.hashCode,
+        '¡Tarea próxima a vencer!',
+        'La tarea "${task.titulo}" vence mañana.',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_reminder_channel',
+            'Task Reminders',
+            channelDescription: 'Reminders for tasks',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+      );
+    } else {
+      // Si la tarea tiene hora específica, programar según los minutos de anticipación
+      final DateTime? fechaHoraVencimiento = task.getFechaHoraVencimiento();
+      
+      if (fechaHoraVencimiento == null) return;
+      
+      final scheduledDate = tz.TZDateTime.from(
+        fechaHoraVencimiento.subtract(Duration(minutes: task.minutosAnticipacion)),
+        tz.local,
+      );
+
+      // Verificar si la fecha ya pasó
+      if (scheduledDate.isBefore(tz.TZDateTime.now(tz.local))) {
+        return;
+      }
+
+      String tiempoAnticipacion = '';
+      if (task.minutosAnticipacion >= 1440) {
+        tiempoAnticipacion = '${task.minutosAnticipacion ~/ 1440} día(s)';
+      } else if (task.minutosAnticipacion >= 60) {
+        tiempoAnticipacion = '${task.minutosAnticipacion ~/ 60} hora(s)';
+      } else {
+        tiempoAnticipacion = '${task.minutosAnticipacion} minutos';
+      }
+
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        task.id.hashCode,
+        '¡Tarea próxima a vencer!',
+        'La tarea "${task.titulo}" vence en $tiempoAnticipacion.',
+        scheduledDate,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'task_reminder_channel',
+            'Task Reminders',
+            channelDescription: 'Reminders for tasks',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+    }
   }
 
   Future<void> cancelTaskReminder(Task task) async {
