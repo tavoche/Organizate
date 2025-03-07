@@ -20,6 +20,65 @@ class FirebaseService {
     }
   }
 
+  Future<UserModel?> getUserProfile(String userId) async {
+  try {
+    DocumentSnapshot doc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+
+    if (!doc.exists) {
+      print("No se encontró el perfil del usuario en Firestore");
+      return null;
+    }
+
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+    return UserModel(
+      id: userId,
+      name: data["name"] ?? "Usuario sin nombre",
+      email: data["email"] ?? "",
+      phoneNumber: data["phoneNumber"] ?? "",
+      birthDate: data["birthDate"] is Timestamp 
+          ? (data["birthDate"] as Timestamp).toDate()
+          : DateTime(2000, 1, 1), // Valor por defecto si no es Timestamp
+      notificationsPreference: data["notificationsPreference"] ?? false,
+      themePreference: data["themePreference"] ?? "light",
+      location: data["location"] ?? "",
+      userType: data["userType"] ?? "standard",
+    );
+  } catch (e) {
+    print("Error obteniendo perfil de usuario: $e");
+    return null;
+  }
+}
+
+
+  Future<void> checkAndUpdateUserProfile(User user) async {
+    DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    DocumentSnapshot doc = await userRef.get();
+
+    if (!doc.exists) {
+      await userRef.set({
+        "name": "Usuario sin nombre",
+        "email": user.email,
+        "phoneNumber": "",
+        "birthDate": DateTime(2000, 1, 1),
+        "notificationsPreference": false,
+        "themePreference": "light",
+        "location": "",
+        "userType": "standard",
+      }, SetOptions(merge: true));
+    }
+  }
+
+
+
+  Future<void> updateUserProfile(UserModel user) async {
+    try {
+      await _firestore.collection('users').doc(user.id).update(user.toMap());
+    } catch (e) {
+      print("Error actualizando perfil: $e");
+    }
+  }
+
   Future<User?> signUp(String email, String password) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
@@ -111,12 +170,12 @@ class FirebaseService {
     }
   }
 
-  Future<void> updateUserProfile(UserModel user) async {
+  /*Future<void> updateUserProfile(UserModel user) async {
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
       await _firestore.collection('users').doc(currentUser.uid).update(user.toMap());
     }
-  }
+  }*/
 
   Future<String> getUserName() async {
     User? user = _auth.currentUser;

@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/user.dart';
@@ -68,7 +69,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Future<void> _register() async {
+  /*Future<void> _register() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -127,7 +128,86 @@ class _RegisterScreenState extends State<RegisterScreen> {
         }
       }
     }
+  }*/
+
+  Future<void> _register() async {
+  if (!_formKey.currentState!.validate()) return;
+
+  setState(() {
+    _isLoading = true;
+  });
+
+  try {
+    // Intentar registrar al usuario
+    final user = await _firebaseService.signUp(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (user != null) {
+      // Crear perfil de usuario
+      final userModel = UserModel(
+        id: user.uid,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phoneNumber: _phoneController.text.trim(),
+        birthDate: _selectedDate,
+        notificationsPreference: _notificationsEnabled,
+        themePreference: _selectedTheme,
+        location: _locationController.text.trim(),
+        userType: _selectedUserType,
+      );
+
+      await _firebaseService.createUserProfile(userModel);
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(
+              userName: _nameController.text,
+              updateTask: _firebaseService.updateTask,
+              deleteTask: _firebaseService.deleteTask,
+            ),
+          ),
+        );
+      }
+    }
+  } on FirebaseAuthException catch (e) {
+    // Manejo de errores específicos de Firebase
+    String errorMessage = 'Ocurrió un error. Inténtalo de nuevo.';
+
+    if (e.code == 'email-already-in-use') {
+      errorMessage = 'El correo ya está registrado. Intenta iniciar sesión.';
+    } else if (e.code == 'weak-password') {
+      errorMessage = 'La contraseña es demasiado débil. Usa una más segura.';
+    } else if (e.code == 'invalid-email') {
+      errorMessage = 'El formato del correo no es válido.';
+    } else if (e.code == 'operation-not-allowed') {
+      errorMessage = 'El registro de usuarios está deshabilitado.';
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMessage)),
+      );
+    }
+  } catch (e) {
+    // Captura de errores genéricos
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error inesperado: ${e.toString()}')),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

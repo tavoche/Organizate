@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:organiz4t3/screens/forgot_password_screen.dart';
 import 'package:organiz4t3/screens/register_screen.dart';
-import 'package:organiz4t3/services/firebase_service.dart';
-import 'package:organiz4t3/widgets/social_login_button.dart';
-import '../services/auth_service.dart'; // Importa la pantalla de registro
+import 'package:organiz4t3/services/firebase_service.dart'; // Importa la pantalla de registro
 import 'home_screen.dart'; // Importa la pantalla de registro
-import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -17,7 +13,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final AuthService _auth = AuthService();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -50,6 +45,7 @@ class _LoginScreenState extends State<LoginScreen> {
           });
           if (user != null) {
             // Obtener el nombre de usuario del perfil de Firebase
+            await _firebaseService.checkAndUpdateUserProfile(user);
             String userName = await _firebaseService.getUserName();
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
@@ -76,48 +72,6 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       }
-    }
-  }
-
-  void _loginWithGoogle() async {
-    UserCredential? userCredential = await _auth.signInWithGoogle();
-    User? user = userCredential?.user; // Extrae el usuario de UserCredential
-    if (user != null) {
-    // Obtener el nombre de usuario del perfil de Firebase
-      String userName = await _firebaseService.getUserName();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen(
-                userName: userName,
-                updateTask: _firebaseService.updateTask,
-                deleteTask: _firebaseService.deleteTask,
-              ),
-        ),
-          );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al iniciar sesión. Verifica tus credenciales.')),
-      );
-    }
-  }
-
-  void _loginWithFacebook() async {
-    UserCredential? userCredential = await _auth.signInWithFacebook();
-    User? user = userCredential?.user; // Extrae el usuario de UserCredential
-    if (user != null) {
-    // Obtener el nombre de usuario del perfil de Firebase
-      String userName = await _firebaseService.getUserName();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen(
-                userName: userName,
-                updateTask: _firebaseService.updateTask,
-                deleteTask: _firebaseService.deleteTask,
-              ),
-        ),
-          );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Error al iniciar sesión. Verifica tus credenciales.')),
-      );
     }
   }
 
@@ -148,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),   
-                  // esto es para ver que hace
+                 
                   const SizedBox(height: 24),
 
                   // Title
