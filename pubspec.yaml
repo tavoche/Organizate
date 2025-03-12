@@ -35,7 +35,7 @@ dependencies:
   cloud_firestore: ^5.6.5
   flutter_local_notifications: ^18.0.1 # o la versión más reciente
   timezone: ^0.10.0 # Necesario para planificar notificaciones en una zona horaria específica
-  flutter_native_timezone: ^2.0.0 # Necesario para obtener la zona horaria local
+  flutter_timezone: ^4.1.0 # Necesario para obtener la zona horaria local
   intl: ^0.19.0 # o la versión mas reciente
   shrine_images: ^2.0.2
   authentication_buttons: 0.0.5 
@@ -46,7 +46,6 @@ dependencies:
   uuid: ^3.0.7
   flutter_spinkit: ^5.1.0
   shared_preferences: ^2.1.1
-  workmanager: ^0.5.1
   firebase_messaging: ^15.2.0
   flutter_localizations:
     sdk: flutter
@@ -55,6 +54,7 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   provider: ^6.1.2
+  share_plus: ^7.0.2
 
 dev_dependencies:
   flutter_test:

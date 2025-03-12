@@ -41,6 +41,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
@@ -73,5 +75,21 @@
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
 	<string>1:647182178399:ios:eb355c712475465326a3ea</string>
+	<!-- Permisos para notificaciones -->
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>fetch</string>
+        <string>remote-notification</string>
+    </array>
+
+	<!-- Permission for notifications -->
+    <key>NSCameraUsageDescription</key>
+    <string>Esta aplicación necesita acceso a la cámara para escanear códigos QR</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Esta aplicación necesita acceso a la galería para seleccionar imágenes</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Esta aplicación necesita acceso al micrófono para grabar notas de voz</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Esta aplicación necesita acceso a la ubicación para mostrar tareas cercanas</string>
 </dict>
 </plist>

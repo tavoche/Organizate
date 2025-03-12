@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:organiz4t3/screens/AuthWrapper.dart';
+import 'package:organiz4t3/services/notification_service.dart';
 import 'package:organiz4t3/theme/theme_provider.dart';
 import 'firebase_options.dart';
 import 'package:provider/provider.dart'; // Agrega este import
@@ -10,6 +11,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Inicializar el servicio de notificaciones
+  await NotificationService().init();
 
   runApp(
     ChangeNotifierProvider(

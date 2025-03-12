@@ -1,0 +1,2 @@
+/Users/gustavo.benavides/Desktop/Personal/Org4niz4t3/Organizate/android/app/.cxx/RelWithDebInfo/1v16186b/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/gustavo.benavides/Desktop/Personal/Org4niz4t3/Organizate/android/app/.cxx/RelWithDebInfo/1v16186b/armeabi-v7a/CMakeFiles/rebuild_cache.dir
