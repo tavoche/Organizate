@@ -1,11 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:organiz4t3/services/notification_service.dart';
 import '../models/task.dart';
 import '../models/user.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final NotificationService _notificationService = NotificationService();
 
   User? get currentUser => _auth.currentUser;
 
@@ -16,6 +18,7 @@ class FirebaseService {
       return result.user;
     } catch (e) {
       print(e.toString());
+      print('Error en signIn: ${e.toString()}');
       return null;
     }
   }
@@ -81,17 +84,38 @@ class FirebaseService {
 
   Future<User?> signUp(String email, String password) async {
     try {
+      // Imprimir los valores para depuración
+      print('Intentando registrar con email: $email y password: ${password.length} caracteres');
+      
+      // Verificar que el email y password no estén vacíos
+      if (email.isEmpty || password.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'invalid-credential',
+          message: 'El correo o la contraseña no pueden estar vacíos',
+        );
+      }
       UserCredential result = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
+      print('Usuario creado exitosamente: ${result.user?.uid}');
       return result.user;
+    
+    } on FirebaseAuthException catch (e) {
+      // Manejar errores específicos de Firebase Auth
+      print('FirebaseAuthException en signUp: ${e.code} - ${e.message}');
+      rethrow; // Relanzar la excepción para que pueda ser manejada en la UI
     } catch (e) {
-      print(e.toString());
-      return null;
+      // Manejar otros errores
+      print('Error general en signUp: ${e.toString()}');
+      rethrow;
     }
   }
 
   Future<void> signOut() async {
-    await _auth.signOut();
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      print('Error en signOut: ${e.toString()}');
+    }
   }
 
   Future<UserModel?> getCurrentUserModel() async {
@@ -110,7 +134,22 @@ class FirebaseService {
   Future<void> createUserProfile(UserModel user) async {
     User? currentUser = _auth.currentUser;
     if (currentUser != null) {
-      await _firestore.collection('users').doc(currentUser.uid).set(user.toMap());
+      try {
+        await _firestore.collection('users').doc(currentUser.uid).set(user.toMap());
+        
+        // Guardar token de notificación
+        String? token = await _notificationService.getToken();
+        if (token != null) {
+          await _firestore.collection('users').doc(currentUser.uid).update({
+            'notificationToken': token,
+          });
+        }
+      } catch (e) {
+        print('Error al crear perfil de usuario: ${e.toString()}');
+        rethrow;
+      }
+    } else {
+      throw Exception('No hay usuario autenticado');
     }
   }
 
@@ -180,8 +219,14 @@ class FirebaseService {
   Future<String> getUserName() async {
     User? user = _auth.currentUser;
     if (user != null) {
-      DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
-      return userDoc.get('name') ?? 'Usuario';
+      try {
+        DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          return userDoc.get('name') ?? 'Usuario';
+        }
+      } catch (e) {
+        print('Error al obtener nombre de usuario: ${e.toString()}');
+      }
     }
     return 'Usuario';
   }

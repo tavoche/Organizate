@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/task.dart';
 import '../services/share_service.dart';
+import '../services/firebase_service.dart';
+import 'edit_task_screen.dart';
 
 class TaskDetailsScreen extends StatefulWidget {
   final Task task;
@@ -14,10 +16,18 @@ class TaskDetailsScreen extends StatefulWidget {
 
 class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
   final ShareService _shareService = ShareService();
+  final FirebaseService _firebaseService = FirebaseService();
   final TextEditingController _emailController = TextEditingController();
   bool _isLoading = false;
   bool _isUserRegistered = false;
   String _errorMessage = '';
+  late Task _task;
+
+  @override
+  void initState() {
+    super.initState();
+    _task = widget.task;
+  }
 
   @override
   void dispose() {
@@ -70,7 +80,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     });
 
     try {
-      await _shareService.shareTaskWithUser(widget.task, _emailController.text);
+      await _shareService.shareTaskWithUser(_task, _emailController.text);
       if (mounted) {
         Navigator.pop(context); // Cerrar el diálogo
         ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +162,97 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
     );
   }
 
+  // Editar tarea
+  Future<void> _editTask() async {
+    final updatedTask = await Navigator.push<Task>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditTaskScreen(task: _task),
+      ),
+    );
+
+    if (updatedTask != null) {
+      setState(() {
+        _task = updatedTask;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tarea actualizada correctamente')),
+      );
+    }
+  }
+
+  // Eliminar tarea
+  Future<void> _deleteTask() async {
+    // Mostrar diálogo de confirmación
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar tarea'),
+        content: const Text('¿Estás seguro de que deseas eliminar esta tarea? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        await _firebaseService.deleteTask(_task.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tarea eliminada correctamente')),
+          );
+          Navigator.pop(context, true); // Volver a la pantalla anterior con resultado de eliminación
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar la tarea: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  // Marcar tarea como completada/pendiente
+  Future<void> _toggleTaskCompletion() async {
+    try {
+      setState(() {
+        _task.completada = !_task.completada;
+      });
+      
+      await _firebaseService.updateTask(_task);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_task.completada 
+              ? 'Tarea marcada como completada' 
+              : 'Tarea marcada como pendiente'
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al actualizar la tarea: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -173,7 +274,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       subtitle: const Text('Envía un mensaje con los detalles de la tarea'),
                       onTap: () {
                         Navigator.pop(context);
-                        _shareService.shareTask(widget.task, context);
+                        _shareService.shareTask(_task, context);
                       },
                     ),
                     ListTile(
@@ -190,6 +291,16 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               );
             },
           ),
+          // Botón para editar
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: _editTask,
+          ),
+          // Botón para eliminar
+          IconButton(
+            icon: const Icon(Icons.delete),
+            onPressed: _deleteTask,
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -200,7 +311,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
             children: [
               // Título
               Text(
-                widget.task.titulo,
+                _task.titulo,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -224,7 +335,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         const Icon(Icons.category, size: 16, color: Colors.blue),
                         const SizedBox(width: 4),
                         Text(
-                          widget.task.categoria,
+                          _task.categoria,
                           style: const TextStyle(
                             color: Colors.blue,
                             fontWeight: FontWeight.bold,
@@ -240,7 +351,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: _getPriorityColor(widget.task.prioridad).withOpacity(0.1),
+                      color: _getPriorityColor(_task.prioridad).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
@@ -248,13 +359,13 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                         Icon(
                           Icons.flag,
                           size: 16,
-                          color: _getPriorityColor(widget.task.prioridad),
+                          color: _getPriorityColor(_task.prioridad),
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          'Prioridad ${widget.task.prioridad}',
+                          'Prioridad ${_task.prioridad}',
                           style: TextStyle(
-                            color: _getPriorityColor(widget.task.prioridad),
+                            color: _getPriorityColor(_task.prioridad),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -275,9 +386,9 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                widget.task.descripcion.isEmpty
+                _task.descripcion.isEmpty
                     ? 'Sin descripción'
-                    : widget.task.descripcion,
+                    : _task.descripcion,
                 style: const TextStyle(
                   fontSize: 16,
                   height: 1.5,
@@ -299,19 +410,19 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                   const Icon(Icons.calendar_today),
                   const SizedBox(width: 8),
                   Text(
-                    DateFormat('EEEE, dd MMMM, yyyy').format(widget.task.fechaVencimiento),
+                    DateFormat('EEEE, dd MMMM, yyyy').format(_task.fechaVencimiento),
                     style: const TextStyle(fontSize: 16),
                   ),
                 ],
               ),
-              if (widget.task.horaVencimiento != null) ...[
+              if (_task.horaVencimiento != null) ...[
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     const Icon(Icons.access_time),
                     const SizedBox(width: 8),
                     Text(
-                      widget.task.horaVencimiento!.format(context),
+                      _task.horaVencimiento!.format(context),
                       style: const TextStyle(fontSize: 16),
                     ),
                   ],
@@ -320,7 +431,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               const SizedBox(height: 24),
               
               // Notificación
-              if (widget.task.horaVencimiento != null) ...[
+              if (_task.horaVencimiento != null) ...[
                 const Text(
                   'Notificación',
                   style: TextStyle(
@@ -334,7 +445,7 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
                     const Icon(Icons.notifications_active),
                     const SizedBox(width: 8),
                     Text(
-                      _formatNotificationTime(widget.task.minutosAnticipacion),
+                      _formatNotificationTime(_task.minutosAnticipacion),
                       style: const TextStyle(fontSize: 16),
                     ),
                   ],
@@ -354,21 +465,37 @@ class _TaskDetailsScreenState extends State<TaskDetailsScreen> {
               Row(
                 children: [
                   Icon(
-                    widget.task.completada
+                    _task.completada
                         ? Icons.check_circle
                         : Icons.pending_actions,
-                    color: widget.task.completada ? Colors.green : Colors.orange,
+                    color: _task.completada ? Colors.green : Colors.orange,
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    widget.task.completada ? 'Completada' : 'Pendiente',
+                    _task.completada ? 'Completada' : 'Pendiente',
                     style: TextStyle(
                       fontSize: 16,
-                      color: widget.task.completada ? Colors.green : Colors.orange,
+                      color: _task.completada ? Colors.green : Colors.orange,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 32),
+              
+              // Botón para cambiar estado
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: _toggleTaskCompletion,
+                  icon: Icon(_task.completada ? Icons.refresh : Icons.check),
+                  label: Text(_task.completada ? 'Marcar como pendiente' : 'Marcar como completada'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _task.completada ? Colors.orange : Colors.green,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),

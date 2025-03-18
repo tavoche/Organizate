@@ -87,9 +87,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-
                   const SizedBox(height: 40),
-
                   // App Icon
                   Container(
                     width: 100,
@@ -195,8 +193,23 @@ class _LoginScreenState extends State<LoginScreen> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
-        onPressed: _isLoading ? null : _signIn,
-        child: _isLoading? const CircularProgressIndicator(color: Colors.white): const Text('Iniciar Sesión'),
+      onPressed: _isLoading ? null : _signIn,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+        child: _isLoading 
+        ? const CircularProgressIndicator(color: Colors.white) 
+        : const Text('Iniciar Sesión',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }
@@ -205,10 +218,27 @@ class _LoginScreenState extends State<LoginScreen> {
     return SizedBox(
       width: double.infinity,
       height: 50,
-      child: OutlinedButton(
-        onPressed: () {Navigator.push(context, MaterialPageRoute(builder: (context) => const RegisterScreen()),);
-        },
-        child: const Text('Registrarse'),
+      child: ElevatedButton(
+      onPressed: () {
+        Navigator.push(
+          context, 
+          MaterialPageRoute(builder: (context) => const RegisterScreen()),
+        );
+      },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFADD8E6),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0,
+        ),
+        child: const Text('Registrarse',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

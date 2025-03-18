@@ -68,7 +68,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      backgroundColor: isDarkMode ? const Color(0xFF121212) : Colors.grey[50],
       appBar: AppBar(
         title: const Text('Mis Tareas'),
         actions: [
@@ -119,9 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 8),
                 Text(
                   'Aquí están tus tareas para hoy',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+                  style: Theme.of(context).textTheme.bodyLarge,
                 ),
                 const SizedBox(height: 16),
                 // Filtros
@@ -186,14 +186,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           Icon(
                             Icons.task_alt,
                             size: 80,
-                            color: Colors.grey[400],
+                            color: isDarkMode ? Colors.grey[400] : Colors.grey[300],
                           ),
                           const SizedBox(height: 16),
                           Text(
                             'No hay tareas',
                             style: TextStyle(
                               fontSize: 18,
-                              color: Colors.grey[600],
+                              color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                             ),
                           ),
                         ],
@@ -226,6 +226,19 @@ class _HomeScreenState extends State<HomeScreen> {
                               }
                             });
                           },
+                          // Añadir el nuevo callback:
+                          onViewDetails: (task, result) async {
+                            if (result == true) {
+                              // Si se eliminó la tarea
+                              await widget.deleteTask(task.id);
+                              setState(() {
+                                tasks.removeWhere((t) => t.id == task.id);
+                              });
+                            } else {
+                              // Recargar las tareas para obtener cualquier cambio
+                              _loadTasks();
+                            }
+                          },
                         );
                       },
                     ),
@@ -247,17 +260,22 @@ class _HomeScreenState extends State<HomeScreen> {
             _loadTasks();
           }
         },
+        backgroundColor: Theme.of(context).primaryColor,
         child: const Icon(Icons.add),
       ),
     );
   }
 }
 
+// Modifica la clase TaskCard para que reciba una función de callback adicional
+// que maneje el resultado de la pantalla de detalles
+
 class TaskCard extends StatelessWidget {
   final Task task;
   final VoidCallback onToggleComplete;
   final VoidCallback onDelete;
   final Function(Task) onEdit;
+  final Function(Task, bool?) onViewDetails; // Nueva función de callback
 
   const TaskCard({
     Key? key,
@@ -265,193 +283,252 @@ class TaskCard extends StatelessWidget {
     required this.onToggleComplete,
     required this.onDelete,
     required this.onEdit,
+    required this.onViewDetails,
   }) : super(key: key);
 
-  Color _getPriorityColor() {
+  // Método para mostrar el diálogo de confirmación
+  Future<void> _showDeleteConfirmationDialog(BuildContext context) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar tarea'),
+        content: const Text('¿Estás seguro de que deseas eliminar esta tarea? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      onDelete();
+    }
+  }
+
+  Color _getPriorityColor(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     switch (task.prioridad.toLowerCase()) {
       case 'alta':
-        return Colors.red[400]!;
+        return isDarkMode ? Colors.red[300]! : Colors.red[400]!;
       case 'media':
-        return Colors.orange[400]!;
+        return isDarkMode ? Colors.orange[300]! : Colors.orange[400]!;
       case 'baja':
-        return Colors.green[400]!;
+        return isDarkMode ? Colors.green[300]! : Colors.green[400]!;
       default:
-        return Colors.blue[400]!;
+        return isDarkMode ? Colors.blue[300]! : Colors.blue[400]!;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDarkMode ? Colors.white : Colors.black87;
+    final completedTextColor = isDarkMode ? Colors.grey[400] : Colors.grey[600];
+    return Container(
       margin: const EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, 2),
+            blurRadius: 8,
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            offset: const Offset(0, 1),
+            blurRadius: 4,
+            spreadRadius: 0,
+          ),
+        ],
       ),
-      child: InkWell(
+      child: Material(
+        color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.white,
         borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => TaskDetailsScreen(task: task),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  // Categoría
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.blue[50],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      task.categoria,
-                      style: TextStyle(
-                        color: Colors.blue[700],
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  // Prioridad
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getPriorityColor().withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      'Prioridad ${task.prioridad}',
-                      style: TextStyle(
-                        color: _getPriorityColor(),
-                        fontWeight: FontWeight.w500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  // Menú de opciones
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (value) {
-                      if (value == 'edit') {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EditTaskScreen(task: task),
-                          ),
-                        ).then((updatedTask) {
-                          if (updatedTask != null) {
-                            onEdit(updatedTask);
-                          }
-                        });
-                      } else if (value == 'delete') {
-                        onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text('Editar'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Eliminar'),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TaskDetailsScreen(task: task),
               ),
-              const SizedBox(height: 12),
-              // Título y checkbox
-              Row(
-                children: [
-                  Checkbox(
-                    value: task.completada,
-                    onChanged: (_) => onToggleComplete(),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      task.titulo,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        decoration: task.completada
-                            ? TextDecoration.lineThrough
-                            : null,
-                        color: task.completada ? Colors.grey : Colors.black87,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Descripción
-              if (task.descripcion.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(left: 40),
-                  child: Text(
-                    task.descripcion,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              // Fecha
-              Padding(
-                padding: const EdgeInsets.only(left: 40),
-                child: Row(
+            );
+            
+            // Llamar a la función de callback con el resultado
+            onViewDetails(task, result as bool?);
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 14,
-                      color: Colors.grey[600],
+                    // Categoría
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? Colors.blue[900] : Colors.blue[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        task.categoria,
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.blue[200] : Colors.blue[700],
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      DateFormat('dd MMM, yyyy').format(task.fechaVencimiento),
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
+                    const SizedBox(width: 8),
+                    // Prioridad
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _getPriorityColor(context).withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Prioridad ${task.prioridad}',
+                        style: TextStyle(
+                          color: _getPriorityColor(context),
+                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Menú de opciones
+                    PopupMenuButton<String>(
+                      icon: Icon(Icons.more_vert, color: isDarkMode ? Colors.white70 : Colors.grey[700]),
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => EditTaskScreen(task: task),
+                            ),
+                          ).then((updatedTask) {
+                            if (updatedTask != null) {
+                              onEdit(updatedTask);
+                            }
+                          });
+                        } else if (value == 'delete') {
+                          // Mostrar diálogo de confirmación antes de eliminar
+                          _showDeleteConfirmationDialog(context);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.edit, color: Colors.blue),
+                              const SizedBox(width: 8),
+                              Text('Editar', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              const Icon(Icons.delete, color: Colors.red),
+                              const SizedBox(width: 8),
+                              Text('Eliminar', style: TextStyle(color: isDarkMode ? Colors.white : Colors.black87)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Título y checkbox
+                Row(
+                  children: [
+                    Checkbox(
+                      value: task.completada,
+                      onChanged: (_) => onToggleComplete(),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        task.titulo,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          decoration: task.completada
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: task.completada ? completedTextColor : textColor,
+                        ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 8),
+                // Descripción
+                if (task.descripcion.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 40),
+                    child: Text(
+                      task.descripcion,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                // Fecha
+                Padding(
+                  padding: const EdgeInsets.only(left: 40),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: 14,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        DateFormat('dd MMM, yyyy').format(task.fechaVencimiento),
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

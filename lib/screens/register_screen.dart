@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/user.dart';
 import '../services/firebase_service.dart';
 import '../theme/theme_provider.dart';
-import 'home_screen.dart';
+import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
@@ -123,15 +123,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
           await themeProvider.saveTheme(_selectedTheme);
         }
 
+        // Cerrar sesión para que el usuario inicie sesión manualmente
+        await FirebaseAuth.instance.signOut();
+
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(
-                userName: _nameController.text,
-                updateTask: _firebaseService.updateTask,
-                deleteTask: _firebaseService.deleteTask,
+          // Mostrar diálogo de éxito
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              title: const Text('Registro exitoso'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                    size: 64,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    '¡Tu cuenta ha sido creada exitosamente!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ahora puedes iniciar sesión con tu correo: ${_emailController.text}',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
               ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => const LoginScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Iniciar sesión'),
+                ),
+              ],
             ),
           );
         }
@@ -139,27 +181,81 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } on FirebaseAuthException catch (e) {
       // Manejo de errores específicos de Firebase
       String errorMessage = 'Ocurrió un error. Inténtalo de nuevo.';
+      String errorTitle = 'Error de registro';
 
       if (e.code == 'email-already-in-use') {
-        errorMessage = 'El correo ya está registrado. Intenta iniciar sesión.';
+        errorTitle = 'Correo ya registrado';
+        errorMessage = 'El correo electrónico ya está registrado. Intenta iniciar sesión o usa otro correo.';
       } else if (e.code == 'weak-password') {
-        errorMessage = 'La contraseña es demasiado débil. Usa una más segura.';
+        errorTitle = 'Contraseña débil';
+        errorMessage = 'La contraseña es demasiado débil. Usa una contraseña más segura con al menos 6 caracteres.';
       } else if (e.code == 'invalid-email') {
-        errorMessage = 'El formato del correo no es válido.';
+        errorTitle = 'Correo inválido';
+        errorMessage = 'El formato del correo electrónico no es válido. Verifica e intenta nuevamente.';
       } else if (e.code == 'operation-not-allowed') {
-        errorMessage = 'El registro de usuarios está deshabilitado.';
+        errorTitle = 'Operación no permitida';
+        errorMessage = 'El registro de usuarios está deshabilitado temporalmente. Intenta más tarde.';
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMessage)),
+        // Mostrar diálogo de error
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(errorTitle),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  errorMessage,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
         );
       }
     } catch (e) {
       // Captura de errores genéricos
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error inesperado: ${e.toString()}')),
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error inesperado'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  color: Colors.red,
+                  size: 64,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Ha ocurrido un error inesperado: ${e.toString()}',
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Entendido'),
+              ),
+            ],
+          ),
         );
       }
     } finally {
@@ -169,6 +265,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
         });
       }
     }
+  }
+
+  Widget _buildRegisterButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _register,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.blue,// Azul brillante como en la imagen
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 0, // Sin sombra para un diseño más plano
+        ),
+        child: _isLoading
+            ? const CircularProgressIndicator(color: Colors.white)
+            : const Text(
+                'Registrarse',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+      ),
+    );
   }
 
   @override
@@ -569,27 +692,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 32),
                   
                   // Register Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _register,
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: _isLoading
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              'Registrarse',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                  ),
+                  _buildRegisterButton(),
                   const SizedBox(height: 24),
                   
                   // Login Link
